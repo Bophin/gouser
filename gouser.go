@@ -6,7 +6,6 @@ import (
 	"io"
 	"fmt"
 	"strings"
-	"io/ioutil"
 	"flag"
 )
 
@@ -16,8 +15,8 @@ func main() {
 	flag.Parse()
 	args := flag.Args()
 
-	f, _ := os.OpenFile(pwdfile, os.O_CREATE, 0644)
-	f.Close()
+	//f, _ := os.OpenFile(pwdfile, os.O_CREATE, 0644)
+	//f.Close()
 	
 	
 	if len(args) != 2 {
@@ -94,14 +93,41 @@ func userExists(username string) bool {
 	return false
 }
 
+func readFile(name string) (string, error) {
+	file, err := os.OpenFile(pwdfile, os.O_RDONLY | os.O_CREATE, 0644)
+	if err != nil {
+		return "", err
+	}
+	
+	b := make([]byte, 1000)
+	for {
+		n, err := file.Read(b)
+		if err == io.EOF {
+			return string(b), nil
+		} else if err != nil {
+			return "", err
+		}
+
+		if n < len(b) {
+			break
+		} else {
+			b2 := make([]byte, cap(b)*2, cap(b)*2)
+			for i := range b {
+				b2[i] = b[i]
+			}
+			b = b2
+		}
+	}
+	file.Close()
+	return string(b), nil
+}
+
 func getUsers() []string {
-	file, err := ioutil.ReadFile(pwdfile)
+	//Splits per row
+	f_str, err := readFile(pwdfile)
 	if err != nil {
 		panic(err)
 	}
-
-	//Splits per row
-	f_str := string(file)
 	return strings.Split(f_str, "\n")
 
 }
