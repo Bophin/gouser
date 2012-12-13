@@ -23,13 +23,13 @@ func main() {
 
 	switch command {
 		case "check": 
-			if checkPwd(username, password) {
+			if CheckPwd(username, password) {
 				print("Success! logging in..\n")
 			} else {
 				print("Failure.. Invalid username or password.\n")
 			}
 		case "add": 
-			if addUser(username, password) {
+			if AddUser(username, password) {
 				fmt.Printf("user added: %v\n", username)
 			} else {
 				fmt.Printf("user already exists: %v\n", username)
@@ -70,7 +70,7 @@ func initProgram() (username, password string) {
 //Tries to add user to the passwordfile. Returns false if the username
 //already exists in the file. Otherwise it generates password salt and hash
 //which are stored together with the username in the file. 
-func addUser(username, password string) bool {
+func AddUser(username, password string) bool {
 
 	if userExists(username) {
 		return false
@@ -80,7 +80,6 @@ func addUser(username, password string) bool {
 	hash := getHash(salt, password)
 
 	result := fmt.Sprintf("%v:%v:%v\n", username, salt, hash)
-	fmt.Printf("%v", result)
 
 	flags := os.O_WRONLY | os.O_APPEND | os.O_CREATE
 	file, err := os.OpenFile(pwdfile, flags, 0644)
@@ -149,7 +148,7 @@ func genSalt() string {
 
 //Compares the username and password with passwordfile to see if
 //it finds a match.
-func checkPwd(username, password string) bool {
+func CheckPwd(username, password string) bool {
 	users := getUsers()
 
 	for _, val := range users {
