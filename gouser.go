@@ -6,7 +6,6 @@ import (
 	"io"
 	"fmt"
 	"strings"
-	"flag"
 )
 
 type userData struct {
