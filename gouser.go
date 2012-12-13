@@ -9,6 +9,12 @@ import (
 	"flag"
 )
 
+type userData struct {
+	id string
+	salt string
+	hash string
+}
+
 var pwdfile string = "pwd.txt"
 
 func main() {
@@ -84,9 +90,7 @@ func userExists(username string) bool {
 	users := getUsers()
 
 	for _, val := range users {
-		//Splits rows by :
-		row := strings.Split(val, ":")
-		if row[0] == username {
+		if val.id == username {
 			return true
 		}
 	}
@@ -122,14 +126,22 @@ func readFile(name string) (string, error) {
 	return string(b), nil
 }
 
-func getUsers() []string {
+func getUsers() []userData {
 	//Splits per row
 	f_str, err := readFile(pwdfile)
 	if err != nil {
 		panic(err)
 	}
-	return strings.Split(f_str, "\n")
+	rows := strings.Split(f_str, "\n")
 
+	users := make([]userData, len(rows))
+	for i, val := range rows {
+		row := strings.Split(val, ":")
+		if len(row) == 3 {
+			users[i] = userData{row[0], row[1], row[2]}
+		}
+	}
+	return users
 }
 
 func checkPwd(username, password string) bool {
@@ -137,14 +149,13 @@ func checkPwd(username, password string) bool {
 
 	for _, val := range users {
 		//Splits rows by :
-		row := strings.Split(val, ":")
-		if row[0] == username {
-			print(row[1] + " = salt from file\n")
-			hash := getHash(row[1], password)
-			if hash == row[2] {
+		if val.id == username {
+			print(val.salt + " = salt from file\n")
+			hash := getHash(val.salt, password)
+			if hash == val.hash {
 				print("success! logging in..\n")
 			} else {
-				fmt.Printf("%x !=\n%v\n", hash, row[2])
+				fmt.Printf("%v !=\n%v\n", hash, val.hash)
 			}
 		}
 	}
