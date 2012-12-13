@@ -15,32 +15,61 @@ type userData struct {
 	hash string
 }
 
-var pwdfile string = "pwd.txt"
+var pwdfile = "pwd.txt"
+var command = "check"
 
 func main() {
+	username, password := initProgram()
+
+	switch command {
+		case "check": 
+			if checkPwd(username, password) {
+				print("Success! logging in..\n")
+			} else {
+				print("Failure.. Invalid username or password.\n")
+			}
+		case "add": 
+			if addUser(username, password) {
+				fmt.Printf("user added: %v\n", username)
+			} else {
+				fmt.Printf("user already exists: %v\n", username)
+			}
+		default: 
+			fmt.Printf("Error, this should not be possible\n")
+			os.Exit(1)
+	}
+}
+
+func SetPwdFile(name string) {
+	pwdfile = name
+}
+
+//Parses command line arguments and flags, and returns username and password
+//that will be used for the program.
+func initProgram() (username, password string) {
+	pwdflag := flag.String("f", "pwd.txt", "passwordfile to use")
+	cmdflag := flag.Bool("a", false, "sets add mode")
 	flag.Parse()
 	args := flag.Args()
+	
+	pwdfile = *pwdflag
+	if *cmdflag {
+		command = "add"
+	}
 
-	//f, _ := os.OpenFile(pwdfile, os.O_CREATE, 0644)
-	//f.Close()
-	
-	
 	if len(args) != 2 {
 		fmt.Printf("Incorrect usage, write 'gouser [user] [pwd]'\n")
 		os.Exit(0)
 	}
 
-	username := args[0]
-	password := args[1]
-
-	if addUser(username, password) {
-		fmt.Printf("user added: %v\n", username)
-	} else {
-		fmt.Printf("user already exists: %v\n", username)
-		checkPwd(username, password)
-	}
+	username = args[0]
+	password = args[1]
+	return
 }
 
+//Tries to add user to the passwordfile. Returns false if the username
+//already exists in the file. Otherwise it generates password salt and hash
+//which are stored together with the username in the file. 
 func addUser(username, password string) bool {
 
 	if userExists(username) {
@@ -48,7 +77,6 @@ func addUser(username, password string) bool {
 	}
 	
 	salt := genSalt()
-	print(salt + "salt from generation\n")
 	hash := getHash(salt, password)
 
 	result := fmt.Sprintf("%v:%v:%v\n", username, salt, hash)
@@ -68,6 +96,39 @@ func addUser(username, password string) bool {
 	return true
 }
 
+//Checks the passwordfile for the given username.
+func userExists(username string) bool {
+	users := getUsers()
+
+	for _, val := range users {
+		if val.id == username {
+			return true
+		}
+	}
+	return false
+}
+
+//Reads the passwordfile and parses the information from it. The result is returned
+//as a list of userData, with username, salt and hashed password.
+func getUsers() []userData {
+	//Splits per row
+	f_str, err := readFile(pwdfile)
+	if err != nil {
+		panic(err)
+	}
+	rows := strings.Split(f_str, "\n")
+
+	users := make([]userData, len(rows))
+	for i, val := range rows {
+		row := strings.Split(val, ":")
+		if len(row) == 3 {
+			users[i] = userData{row[0], row[1], row[2]}
+		}
+	}
+	return users
+}
+
+//Reads 32 random bytes from /dev/random and returns them as a string
 func genSalt() string {
 	salt := make([]byte, 32)
 	file, err := os.Open("/dev/random")
@@ -86,19 +147,32 @@ func genSalt() string {
 	return fmt.Sprintf("%x", salt)
 }
 
-func userExists(username string) bool {
+//Compares the username and password with passwordfile to see if
+//it finds a match.
+func checkPwd(username, password string) bool {
 	users := getUsers()
 
 	for _, val := range users {
+		//Splits rows by :
 		if val.id == username {
-			return true
+			hash := getHash(val.salt, password)
+			if hash == val.hash {
+				return true
+			}
 		}
 	}
 	return false
 }
 
+func getHash(salt, pwd string) string {
+	hash := sha256.New()
+	io.WriteString(hash, salt + pwd)
+	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+//Reads the file given by name and returns the whole file as a string
 func readFile(name string) (string, error) {
-	file, err := os.OpenFile(pwdfile, os.O_RDONLY | os.O_CREATE, 0644)
+	file, err := os.OpenFile(name, os.O_RDONLY | os.O_CREATE, 0644)
 	if err != nil {
 		return "", err
 	}
@@ -124,46 +198,4 @@ func readFile(name string) (string, error) {
 	}
 	file.Close()
 	return string(b), nil
-}
-
-func getUsers() []userData {
-	//Splits per row
-	f_str, err := readFile(pwdfile)
-	if err != nil {
-		panic(err)
-	}
-	rows := strings.Split(f_str, "\n")
-
-	users := make([]userData, len(rows))
-	for i, val := range rows {
-		row := strings.Split(val, ":")
-		if len(row) == 3 {
-			users[i] = userData{row[0], row[1], row[2]}
-		}
-	}
-	return users
-}
-
-func checkPwd(username, password string) bool {
-	users := getUsers()
-
-	for _, val := range users {
-		//Splits rows by :
-		if val.id == username {
-			print(val.salt + " = salt from file\n")
-			hash := getHash(val.salt, password)
-			if hash == val.hash {
-				print("success! logging in..\n")
-			} else {
-				fmt.Printf("%v !=\n%v\n", hash, val.hash)
-			}
-		}
-	}
-	return false
-}
-
-func getHash(salt, pwd string) string {
-	hash := sha256.New()
-	io.WriteString(hash, salt + pwd)
-	return fmt.Sprintf("%x", hash.Sum(nil))
 }
